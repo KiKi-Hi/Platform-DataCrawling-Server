@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./data/mongo:/data/db
+  redis:
+    image: redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  adminmongo:
+    image: mrvautin/adminmongo
+    environment:
+      - CONNECTION=mongodb://mongo:27017
+    ports:
+      - "1234:1234"
+
+  redis-commander:
+    image: rediscommander/redis-commander
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+
+  fastapi:
+    build: .
+    container_name: fastapi
+    ports:
+      - "8001:8001"
+    depends_on:
+      - redis
+      - mongo
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+    volumes:
+      - .:/app
+
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A worker worker --loglevel=info
+    depends_on:
+      - redis
+      - mongo
+    environment:
+      - TZ=Asia/Seoul
+    working_dir: /app
+    volumes:
+      - .:/app
+
+        
+  portainer:
+    image: portainer/portainer-ce
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9000:9000"

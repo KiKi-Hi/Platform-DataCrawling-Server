@@ -1,8 +1,14 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pymongo
 redis
 celery
 httpx
 selenium
 python-dotenv
+apscheduler
+rabbitmq
+pydantic==1.10.14
+black
+isort
+pre-commit

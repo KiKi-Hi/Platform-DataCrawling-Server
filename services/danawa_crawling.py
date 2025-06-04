@@ -34,6 +34,7 @@ def get_driver(headless=True):
         "--disable-blink-features=AutomationControlled"
     )  # To avoid bot detection
     options.add_argument("--no-sandbox")
+    
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
     # Use a common user agent
@@ -68,14 +69,45 @@ def get_driver(headless=True):
 
 # 최저가 링크
 def get_final_purchase_url(driver):
+    import time
+
+    from selenium.webdriver.common.by import By
+
     try:
         buy_link = driver.find_element(By.CSS_SELECTOR, "a.buy_link")
-        return buy_link.get_attribute("href")
-    except:
+        redirect_link = buy_link.get_attribute("href")
+        print(f"중간 구매 링크: {redirect_link}")
+
+        # 현재 창 핸들 저장
+        main_window = driver.current_window_handle
+        before_handles = set(driver.window_handles)
+
+        # 링크 클릭(새 창/탭일 수도 있으니 클릭으로 처리)
+        driver.execute_script("arguments[0].click();", buy_link)
+        time.sleep(5)  # 충분히 대기
+
+        # 새 창/탭이 열렸는지 확인
+        after_handles = set(driver.window_handles)
+        new_handles = after_handles - before_handles
+
+        if new_handles:
+            # 새 창/탭으로 열렸다면, 그 창으로 전환
+            new_window = new_handles.pop()
+            driver.switch_to.window(new_window)
+            time.sleep(2)
+            final_url = driver.current_url
+            # 새 창 닫고, 원래 창으로 복귀
+            driver.close()
+            driver.switch_to.window(main_window)
+        else:
+            # 새 창이 아니라면, 현재 URL 사용
+            final_url = driver.current_url
+
+        print(f"최종 구매처 URL: {final_url}")
+        return final_url
+    except Exception as e:
+        print(f"구매처 URL 추출 실패: {e}")
         return ""
-
-
-# spec table
 
 
 # 스펙 테이블
@@ -119,19 +151,19 @@ def get_spec_table(driver):
             if not hasattr(row, "find_all"):
                 continue
 
-            header_cells = row.find_all("th", recursive=False)
-            data_cells = row.find_all("td", recursive=False)
+            header_cells = row.find_all("th", recursive=False) # type: ignore
+            data_cells = row.find_all("td", recursive=False) # type: ignore
 
             # Category row
-            if len(header_cells) == 1 and header_cells[0].get("colspan"):
+            if len(header_cells) == 1 and header_cells[0].get("colspan"): # type: ignore
                 current_category = header_cells[0].get_text(strip=True)
                 if "주요사양" in current_category or "스펙" in current_category:
                     current_category = ""
             elif header_cells and data_cells:
                 for i in range(len(header_cells)):
                     key = header_cells[i].get_text(strip=True)
-                    if not key and header_cells[i].find("img"):
-                        key = header_cells[i].find("img").get("alt", "icon_spec")
+                    if not key and header_cells[i].find("img"): # type: ignore
+                        key = header_cells[i].find("img").get("alt", "icon_spec") # type: ignore
 
                     if not key:
                         continue
@@ -156,18 +188,20 @@ def get_spec_table(driver):
 
 # 상세 이미지들
 def get_all_detail_images(driver):
+    import time
+
+    from bs4 import BeautifulSoup
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
+
     images = []
     try:
-        # Ensure "상세설명" tab is active
+        # 상세설명 탭 클릭(이미 진입했다면 생략 가능)
         try:
             detail_tab_button = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable(
-                    (
-                        By.CSS_SELECTOR,
-                        "li#danawaProdDetailTabDetail a, "
-                        "ul.info_hd a[href*='#productDescription'], "
-                        "a.tab_anchor[name='productDescription']",  # Tab might be an anchor
-                    )
+                    (By.CSS_SELECTOR, "li#danawaProdDetailTabDetail a, ul.info_hd a[href*='#productDescription'], a.tab_anchor[name='productDescription']")
                 )
             )
             print("  Ensuring '상세설명' tab is active for images.")
@@ -175,95 +209,28 @@ def get_all_detail_images(driver):
                 "arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();",
                 detail_tab_button,
             )
-            time.sleep(3)  # Wait for images to potentially load/relayout
+            time.sleep(2)
         except Exception as tab_e:
-            print(
-                f"  Detail description tab not found or clickable for images, proceeding: {tab_e}"
-            )
+            print(f"  Detail description tab not found or clickable for images, proceeding: {tab_e}")
 
-        # Scroll through the detail section to trigger lazy loading
-        print("  Scrolling to load all detail images...")
-        scroll_pause_time = 0.5  # Faster scroll for images
-        last_height = driver.execute_script("return document.body.scrollHeight")
-
-        # Target specific content areas for scrolling if possible
-        scroll_target_selectors = [
-            "div#detail_info_wrap div.detail_cont",
-            "div#productDescription",
-            "div.product_detail_content_area",
-            "body",  # Fallback to body
-        ]
-        scroll_element_js = "return arguments[0].scrollHeight"
-        scroll_js = "arguments[0].scrollTop = arguments[0].scrollTop + arguments[0].clientHeight;"
-
-        scroll_target_found = False
-        for sel in scroll_target_selectors:
-            try:
-                target_element = driver.find_element(By.CSS_SELECTOR, sel)
-                if target_element:
-                    print(f"  Scrolling within element: {sel}")
-                    element_height = driver.execute_script(
-                        scroll_element_js, target_element
-                    )
-                    current_element_scroll = 0
-                    while current_element_scroll < element_height:
-                        driver.execute_script(scroll_js, target_element)
-                        time.sleep(scroll_pause_time)
-                        current_element_scroll += driver.execute_script(
-                            "return arguments[0].clientHeight;", target_element
-                        )
-                        new_element_height = driver.execute_script(
-                            scroll_element_js, target_element
-                        )
-                        if new_element_height > element_height:  # Content expanded
-                            element_height = new_element_height
-                        else:  # Check if we are at the bottom
-                            scrolled_val = driver.execute_script(
-                                "return arguments[0].scrollTop", target_element
-                            )
-                            if (
-                                scrolled_val
-                                + driver.execute_script(
-                                    "return arguments[0].clientHeight;", target_element
-                                )
-                                >= element_height - 10
-                            ):  # Allow small diff
-                                break
-                    scroll_target_found = True
-                    break
-            except:
-                continue
-
-        if (
-            not scroll_target_found
-        ):  # Fallback to body scroll if no specific target worked
-            print("  Fallback to body scroll for images.")
-            while True:
-                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(scroll_pause_time)
-                new_height = driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
-                    break
-                last_height = new_height
+        # 스크롤로 이미지 로딩 유도
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(1)
 
         print("  Finished scrolling for images.")
         soup = BeautifulSoup(driver.page_source, "html.parser")
-        # Common selectors for detail images section
-        image_containers = soup.select(
-            "div#detail_info_wrap div.detail_cont img, "  # Primary location
-            "div#productDescription img, "  # Inside product description anchor
-            "div.product_detail_content_area img, "  # Another common content area
-            "div.detail_area img"  # General detail area
-        )
-        for img_tag in image_containers:
+
+        # 상세 이미지가 한 장만 있는 경우, 정확한 selector로 추출
+        # (table > tbody > tr > td > div > p > img)
+        img_tags = soup.select("table tbody tr td div p img")
+
+        for img_tag in img_tags:
             src = img_tag.get("src")
-            # Prioritize 'data-original' or other lazy-load attributes if 'src' is a placeholder
             lazy_src = (
                 img_tag.get("data-original")
                 or img_tag.get("data-src")
                 or img_tag.get("_src")
             )
-            # Ensure lazy_src is a string before using startswith
             if isinstance(lazy_src, list):
                 lazy_src = lazy_src[0] if lazy_src else None
 
@@ -279,166 +246,163 @@ def get_all_detail_images(driver):
                 and final_src.startswith("http")
                 and final_src not in images
             ):
-                if (
-                    "spacer.gif" not in final_src and "loading.gif" not in final_src
-                ):  # Filter out placeholders
+                if "spacer.gif" not in final_src and "loading.gif" not in final_src:
                     images.append(final_src)
         print(f"  Extracted {len(images)} unique detail images.")
     except Exception as e:
         print(f"  Error extracting detail images: {e}")
     return images
 
-
 # 연관 상품
-def get_related_products(driver):
-    related = []
-    try:
-        # Related products might not need a specific tab click, often at bottom of page or sidebar
-        # Scroll to bottom to ensure they are loaded
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight*0.8);")
-        time.sleep(0.5)
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(1)
+# def get_related_products(driver):
+#     related = []
+#     try:
+#         # Related products might not need a specific tab click, often at bottom of page or sidebar
+#         # Scroll to bottom to ensure they are loaded
+#         driver.execute_script("window.scrollTo(0, document.body.scrollHeight*0.8);")
+#         time.sleep(0.5)
+#         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+#         time.sleep(1)
 
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        # Common selectors for related product lists (these can vary a lot)
-        related_sections_selectors = [
-            "div.rel_prod_list ul li",
-            "div.relation_goods_list ul li",
-            "div.recommend_product_list ul li",
-            "div.another_goods ul li",
-            "div.prod_rel_list ul li",
-            "div.rel_goods_area ul.goods_list li",
-        ]
+#         soup = BeautifulSoup(driver.page_source, "html.parser")
+#         # Common selectors for related product lists (these can vary a lot)
+#         related_sections_selectors = [
+#             "div.rel_prod_list ul li",
+#             "div.relation_goods_list ul li",
+#             "div.recommend_product_list ul li",
+#             "div.another_goods ul li",
+#             "div.prod_rel_list ul li",
+#             "div.rel_goods_area ul.goods_list li",
+#         ]
 
-        related_items_elements = []
-        for selector in related_sections_selectors:
-            elements = soup.select(selector)
-            if elements:
-                related_items_elements = elements
-                print(f"  Found related products section with selector: {selector}")
-                break
+#         related_items_elements = []
+#         for selector in related_sections_selectors:
+#             elements = soup.select(selector)
+#             if elements:
+#                 related_items_elements = elements
+#                 print(f"  Found related products section with selector: {selector}")
+#                 break
 
-        if not related_items_elements:
-            print("  No related products section found with common selectors.")
-            return []
+#         if not related_items_elements:
+#             print("  No related products section found with common selectors.")
+#             return []
 
-        for item_el in related_items_elements:
-            link_tag = item_el.find("a")
-            if not link_tag:
-                continue
+#         for item_el in related_items_elements:
+#             link_tag = item_el.find("a")
+#             if not link_tag:
+#                 continue
 
-            name = ""
-            link = link_tag.get("href", "")
-            link_str = str(link)
-            if link_str and not link_str.startswith("http"):  # Ensure absolute URL
-                if link_str.startswith("//"):
-                    link = "https:" + link_str
-                elif link_str.startswith("/"):
-                    link = "https://prod.danawa.com" + link_str  # Assuming danawa links
-                else:
-                    link = link_str
-            else:
-                link = link_str
+#             name = ""
+#             link = link_tag.get("href", "")
+#             link_str = str(link)
+#             if link_str and not link_str.startswith("http"):  # Ensure absolute URL
+#                 if link_str.startswith("//"):
+#                     link = "https:" + link_str
+#                 elif link_str.startswith("/"):
+#                     link = "https://prod.danawa.com" + link_str  # Assuming danawa links
+#                 else:
+#                     link = link_str
+#             else:
+#                 link = link_str
 
-            # Try to get name from a dedicated text element, often more reliable
-            name_selectors = [".txt_link", ".prod_name", ".tit", ".name", ".shrt_desc"]
-            for sel in name_selectors:
-                name_element = item_el.select_one(sel)
-                if name_element and name_element.get_text(strip=True):
-                    name = name_element.get_text(strip=True)
-                    break
+#             # Try to get name from a dedicated text element, often more reliable
+#             name_selectors = [".txt_link", ".prod_name", ".tit", ".name", ".shrt_desc"]
+#             for sel in name_selectors:
+#                 name_element = item_el.select_one(sel)
+#                 if name_element and name_element.get_text(strip=True):
+#                     name = name_element.get_text(strip=True)
+#                     break
 
-            price_selectors = [
-                ".price_sect .price",
-                "span.price",
-                "em.num_c",
-                ".prc_c",
-                ".curr_price",
-            ]
-            price = ""
-            for sel in price_selectors:
-                price_element = item_el.select_one(sel)
-                if price_element:
-                    price = (
-                        price_element.get_text(strip=True)
-                        .replace(",", "")
-                        .replace("원", "")
-                    )
-                    break
+#             price_selectors = [
+#                 ".price_sect .price",
+#                 "span.price",
+#                 "em.num_c",
+#                 ".prc_c",
+#                 ".curr_price",
+#             ]
+#             price = ""
+#             for sel in price_selectors:
+#                 price_element = item_el.select_one(sel)
+#                 if price_element:
+#                     price = (
+#                         price_element.get_text(strip=True)
+#                         .replace(",", "")
+#                         .replace("원", "")
+#                     )
+#                     break
 
-            if name and link:
-                related.append(
-                    {"name": name, "price": price, "link": link, "image_url": img_src}
-                )
-        print(f"  Extracted {len(related)} related products.")
-    except Exception as e:
-        print(f"  Error extracting related products: {e}")
-    return related
+#             if name and link:
+#                 related.append(
+#                     {"name": name, "price": price, "link": link, "image_url": img_src}
+#                 )
+#         print(f"  Extracted {len(related)} related products.")
+#     except Exception as e:
+#         print(f"  Error extracting related products: {e}")
+#     return related
 
 
 # 가격 추이
-def get_price_trend_image_url(driver):
-    url = ""
-    try:
-        # Click "가격비교" or "가격추이" tab
-        price_tab_selectors = [
-            "li#danawaProdDetailTabPriceCompare a",  # Price Comparison tab
-            "li#danawaProdDetailTabPrice a",  # Price Trend tab
-            "ul.info_hd a[href*='#priceCompare']",
-            "ul.info_hd a[href*='#priceHistory']",
-            "a.tab_anchor[name='priceCompare']",
-        ]
-        price_tab_button = None
-        for selector in price_tab_selectors:
-            try:
-                button = driver.find_element(By.CSS_SELECTOR, selector)
-                if button.is_displayed() and button.is_enabled():
-                    price_tab_button = button
-                    break
-            except:
-                continue
+# def get_price_trend_image_url(driver):
+#     url = ""
+#     try:
+#         # Click "가격비교" or "가격추이" tab
+#         price_tab_selectors = [
+#             "li#danawaProdDetailTabPriceCompare a",  # Price Comparison tab
+#             "li#danawaProdDetailTabPrice a",  # Price Trend tab
+#             "ul.info_hd a[href*='#priceCompare']",
+#             "ul.info_hd a[href*='#priceHistory']",
+#             "a.tab_anchor[name='priceCompare']",
+#         ]
+#         price_tab_button = None
+#         for selector in price_tab_selectors:
+#             try:
+#                 button = driver.find_element(By.CSS_SELECTOR, selector)
+#                 if button.is_displayed() and button.is_enabled():
+#                     price_tab_button = button
+#                     break
+#             except:
+#                 continue
 
-        if price_tab_button:
-            print("  Clicking price trend/comparison tab.")
-            driver.execute_script(
-                "arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();",
-                price_tab_button,
-            )
-            time.sleep(2.5)  # Wait for graph to load
-        else:
-            print(
-                "  Price trend/comparison tab not found, graph might be visible by default or not present."
-            )
+#         if price_tab_button:
+#             print("  Clicking price trend/comparison tab.")
+#             driver.execute_script(
+#                 "arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();",
+#                 price_tab_button,
+#             )
+#             time.sleep(2.5)  # Wait for graph to load
+#         else:
+#             print(
+#                 "  Price trend/comparison tab not found, graph might be visible by default or not present."
+#             )
 
-        # Selector for price graph image
-        graph_img_selectors = [
-            "img#priceGraphImg",  # Most common ID
-            "div.chart_area img",  # Image within a chart area
-            "img.price_graph_img",
-            "div#price_graph_area img",
-        ]
-        graph_img_element = None
-        for selector in graph_img_selectors:
-            try:
-                graph_img_element = WebDriverWait(driver, 5).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                )
-                if graph_img_element:
-                    break
-            except:
-                continue
+#         # Selector for price graph image
+#         graph_img_selectors = [
+#             "img#priceGraphImg",  # Most common ID
+#             "div.chart_area img",  # Image within a chart area
+#             "img.price_graph_img",
+#             "div#price_graph_area img",
+#         ]
+#         graph_img_element = None
+#         for selector in graph_img_selectors:
+#             try:
+#                 graph_img_element = WebDriverWait(driver, 5).until(
+#                     EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+#                 )
+#                 if graph_img_element:
+#                     break
+#             except:
+#                 continue
 
-        if graph_img_element:
-            url = graph_img_element.get_attribute("src")
-            if url and url.startswith("//"):
-                url = "https:" + url  # Ensure absolute URL
-            print(f"  Extracted price trend image URL: {url if url else 'Not found'}")
-        else:
-            print("  Price trend graph image not found.")
-    except Exception as e:
-        print(f"  Error extracting price trend image: {e}")
-    return url
+#         if graph_img_element:
+#             url = graph_img_element.get_attribute("src")
+#             if url and url.startswith("//"):
+#                 url = "https:" + url  # Ensure absolute URL
+#             print(f"  Extracted price trend image URL: {url if url else 'Not found'}")
+#         else:
+#             print("  Price trend graph image not found.")
+#     except Exception as e:
+#         print(f"  Error extracting price trend image: {e}")
+#     return url
 
 # 상세 페이지 URL
 def get_danawa_actual_purchase_link(bridge_url: str) -> str:
@@ -474,8 +438,8 @@ def crawl_danawa_product_detail(driver, detail_url):
     detail_data["final_purchase_url"] = get_final_purchase_url(driver)
     detail_data["spec_table"] = get_spec_table(driver)
     detail_data["all_detail_images"] = get_all_detail_images(driver)
-    detail_data["related_products"] = get_related_products(driver)
-    detail_data["price_trend_image_url"] = get_price_trend_image_url(driver)
+    # detail_data["related_products"] = get_related_products(driver)
+    # detail_data["price_trend_image_url"] = get_price_trend_image_url(driver)
 
     return detail_data
 

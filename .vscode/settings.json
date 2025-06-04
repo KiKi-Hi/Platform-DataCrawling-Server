@@ -10,6 +10,48 @@
   "python.analysis.autoImportCompletions": true,
   "python.analysis.typeCheckingMode": "basic",
   "python.analysis.useLibraryCodeForTypes": true,
+  "python.analysis.autoImportUserSymbols": true,
+  "python.analysis.indexing": true,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}"
+  ],
+  "python.formatting.provider": "black",
+  "python.formatting.blackArgs": [
+    "--line-length",
+    "88"
+  ],
+  "python.sortImports.args": [
+    "--profile",
+    "black"
+  ],
+  "python.terminal.activateEnvironment": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.python"
+  }
+}
+{
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "editor.cursorStyle": "line",
+  "python.languageServer": "Pylance",
+  "python.analysis.autoImportCompletions": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.useLibraryCodeForTypes": true,
+  "python.analysis.autoImportUserSymbols": true,
+  "python.analysis.indexing": true,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}"
+  ],
   "python.formatting.provider": "black",
   "python.formatting.blackArgs": [
     "--line-length",

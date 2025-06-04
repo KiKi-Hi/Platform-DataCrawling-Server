@@ -3,7 +3,7 @@ import os
 import re
 import time
 from pprint import pprint  # For pretty printing results
-from urllib.parse import quote_plus
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 from bs4 import BeautifulSoup
 from danawa_list import crawl_danawa_product_list
@@ -440,8 +440,20 @@ def get_price_trend_image_url(driver):
         print(f"  Error extracting price trend image: {e}")
     return url
 
+# 상세 페이지 URL
+def get_danawa_actual_purchase_link(bridge_url: str) -> str:
+    """
+    다나와 '최저가 구매하기' bridge URL에서 실제 상품 상세/구매 페이지 URL을 생성
+    """
+    parsed_url = urlparse(bridge_url)
+    query_params = parse_qs(parsed_url.query)
+    pcode = query_params.get('pcode', [None])[0]
+    if pcode:
+        return f"https://prod.danawa.com/info/?pcode={pcode}&keyword=&cate="
+    else:
+        return f"https://prod.danawa.com/info/?keyword={quote_plus(parsed_url.path)}"
 
-# detail로 접근
+# 상세 페이지로 접근 후 각각 메서드 실행
 def crawl_danawa_product_detail(driver, detail_url):
     print(f"Navigating to detail page: {detail_url}")
     try:
@@ -509,12 +521,16 @@ def crawl_products(
     )
     detail_page_driver = get_driver(headless=headless)
 
+    # 상세 페이지 크롤링 // 여기서 부터 문제
     for i, item in enumerate(list_products):
         name = item.get("name", "Unknown Product")
-        print(f"\n상세정보 수집 중 {i+1}/{len(list_products)}: {name}")
-        url = item.get("detail_page_url")
 
-        if not url:
+        # 상세 페이지 url 
+        bridge_url = item.get("detail_page_url")
+        if bridge_url:
+            actual_url = get_danawa_actual_purchase_link(bridge_url)
+            item["actual_purchase_url"] = actual_url
+        if not bridge_url:
             print(f" - 상세 페이지 URL 없음. '{name}' 생략")
             all_product_data.append(
                 {**item, "detail_crawl_error": "Missing detail page URL"}
@@ -522,7 +538,8 @@ def crawl_products(
             continue
 
         try:
-            product_details = crawl_danawa_product_detail(detail_page_driver, url)
+            # 상세 페이지에서 정보 크롤링
+            product_details = crawl_danawa_product_detail(detail_page_driver, bridge_url)
             combined_data = {**item, **product_details}
             all_product_data.append(combined_data)
             print(f" - 수집 성공: {name}")
@@ -548,7 +565,6 @@ def crawl_products(
     except Exception as e:
         print(f"[MONGODB] 저장 중 오류 발생: {e}")
 
-    # JSON 저장 옵션
 
     return all_product_data
 
@@ -573,6 +589,15 @@ def danawa_crawling():
         print(f"가격: {item.get('price')}")
         print(f"옵션: {item.get('options')}")
         print(f"설명: {item.get('description')}")
+        print(f"상세 페이지 URL: {item.get('detail_page_url')}")
+        
+        print(f"최종 구매 URL: {item.get('final_purchase_url')}")
+        print(f"스펙: {item.get('spec_table')}")
+        print(f"상세 이미지: {item.get('all_detail_images')}")
+        print(f"연관 상품: {item.get('related_products')}")
+        print(f"가격 추이 이미지 URL: {item.get('price_trend_image_url')}")
+        print(f"저장된 시간: {datetime.datetime.now().isoformat()}")
+        print("-" * 40)
 
 
 if __name__ == "__main__":

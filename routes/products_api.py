@@ -7,8 +7,11 @@ from celery_worker import celery_app
 from core.config import get_mongo_collection
 from models.product_request import CrawlRequest
 from models.products import ProductModel
-from tasks.product_tasks import (crawl_products_task, get_lowest_price,
-                                 insert_products_task)
+from tasks.product_tasks import (
+    crawl_products_task,
+    get_lowest_price,
+    insert_products_task,
+)
 
 products_col = get_mongo_collection("products")
 
@@ -70,7 +73,7 @@ def health_check():
     return {"status": "ok"}
 
 
-# 그냥 데이터 크롤링
+# 그냥 데이터 크롤링한한 데이터 mongoDB에 삽입
 @router.post("/crawl/")
 def crawl_products(request: CrawlRequest):
     task = crawl_products_task.delay(
@@ -81,18 +84,6 @@ def crawl_products(request: CrawlRequest):
         page_limit=request.page_limit,
     )
     return {"task_id": task.id, "message": "크롤링 작업이 큐에 등록되었습니다."}
-
-
-# 그냥 크롤링한 데이터 mongoDB에 삽입
-@router.post("/insert-products-manual")
-async def insert_products_manual(products: list[ProductModel]):
-    product_dicts = [p.dict() for p in products]
-    task = insert_products_task.delay(product_dicts)
-    return {
-        "message": "적재 작업 큐에 등록 완료",
-        "task_id": task.id,
-        "item_count": len(product_dicts),
-    }
 
 
 # 매주 새로운 데이터 mongoDB에 삽입

@@ -96,10 +96,13 @@ def crawl_danawa_keyboards(
             print(f"  - [{idx+1}] 상품 정보 수집 중...")
 
             try:
-                name = p.find_element(By.CSS_SELECTOR, "p.prod_name > a").text.strip()
+                name_elem = p.find_element(By.CSS_SELECTOR, "p.prod_name > a")
+                name = name_elem.text.strip()
+                detail_page_url = name_elem.get_attribute("href")
                 print(f"    → 이름: {name}")
-            except:
-                print("    → 이름 수집 실패")
+                print(f"    → 상세페이지 URL: {detail_page_url}")
+            except Exception as e:
+                print(f"    → 이름/상세페이지 URL 수집 실패: {e}")
                 continue
 
             try:
@@ -147,6 +150,7 @@ def crawl_danawa_keyboards(
                     "description": spec_keywords,
                     "thumbnail": thumbnail,
                     "options": options,
+                    "detail_page_url": detail_page_url,  # 추가된 부분!
                 }
             )
 
@@ -156,7 +160,6 @@ def crawl_danawa_keyboards(
 
     print(f"\n[완료] 총 {len(results)}개 키보드 상품 수집 완료")
     return results
-
 
 def crawl_danawa_product_list(driver, query, sort=None, max_items=10, page_limit=1):
     return crawl_danawa_keyboards(

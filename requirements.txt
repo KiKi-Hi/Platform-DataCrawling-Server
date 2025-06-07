@@ -12,3 +12,4 @@ pydantic==1.10.14
 black
 isort
 pre-commit
+motor

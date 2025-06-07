@@ -3,11 +3,16 @@ version: '3.8'
 services:
   mongo:
     image: mongo
-    container_name: mongo
+    container_name: kkh-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: kikihi
+      MONGO_INITDB_ROOT_PASSWORD: kikihi
     ports:
-      - "27017:27017"
-    volumes:
-      - ./data/mongo:/data/db
+      - "27017:27017"   # ✅ 이 줄을 추가하여 호스트 PC에서 접근 가능하게
+    networks:
+      - kkh-network
+
   redis:
     image: redis
     container_name: redis
@@ -22,10 +27,11 @@ services:
   adminmongo:
     image: mrvautin/adminmongo
     environment:
-      - CONNECTION=mongodb://localhost:27017
+      - CONNECTION=mongodb://kkh-mongodb:27017
     ports:
       - "1234:1234"
-
+    networks:
+      - kkh-network
   redis-commander:
     image: rediscommander/redis-commander
     environment:
@@ -35,7 +41,9 @@ services:
 
   fastapi:
     build: .
-    container_name: fastapi
+    container_name: kkh-fastapi
+    env_file:
+    - .env.production
     ports:
       - "8001:8001"
     depends_on:
@@ -43,7 +51,8 @@ services:
       - mongo
     working_dir: /app
     command: uvicorn main:app --host 0.0.0.0 --port 8001
-
+    networks:
+      - kkh-network
     volumes:
       - .:/app
 
@@ -66,3 +75,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "9000:9000"
+networks:
+  kkh-network:
+    driver: bridge

@@ -1,13 +1,17 @@
 # config/settings.py
+import os
+from functools import lru_cache
 
 from pydantic import BaseSettings, Field
 
 
 class Settings(BaseSettings):
+    app_env: str = Field("development", env="APP_ENV")
+
     # MongoDB
-    mongo_host: str = Field("localhost")
+    mongo_host: str = Field(..., env="MONGO_HOST")
     mongo_port: int = Field(27017, env="MONGO_PORT")
-    mongo_db: str = Field("kikihi", env="MONGO_DB")
+    mongo_db: str = Field(..., env="MONGO_DB")
 
     # Redis
     redis_host: str = Field("localhost", env="REDIS_HOST")
@@ -15,17 +19,10 @@ class Settings(BaseSettings):
 
     # Celery
     celery_broker_url: str = Field("redis://localhost:6379/0", env="CELERY_BROKER_URL")
-    celery_result_backend: str = Field(
-        "redis://localhost:6379/1", env="CELERY_RESULT_BACKEND"
-    )
-
-    # FastAPI
-    app_env: str = Field("development", env="APP_ENV")
-    app_port: int = Field(8001, env="APP_PORT")
-    debug: bool = Field(True, env="DEBUG")
+    celery_result_backend: str = Field("redis://localhost:6379/1", env="CELERY_RESULT_BACKEND")
 
     class Config:
-        env_file = ".env"
+        env_file = ".env.production"  # 기본값은 .env, 커스터마이징은 아래에서 수행
         env_file_encoding = "utf-8"
 
     @property
@@ -33,5 +30,12 @@ class Settings(BaseSettings):
         return f"mongodb://{self.mongo_host}:{self.mongo_port}/{self.mongo_db}"
 
 
-# 사용
-settings = Settings()  # type: ignore
+@lru_cache()
+def get_settings() -> Settings:
+    env = os.getenv("APP_ENV", "development")
+    env_path = f".env.{env}"
+    return Settings(_env_file=env_path)  # type: ignore
+
+
+# 사용 예시
+settings = get_settings()

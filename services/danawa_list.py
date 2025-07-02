@@ -2,6 +2,7 @@ import time
 from urllib.parse import quote_plus
 
 from bs4 import BeautifulSoup
+from numpy import double
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -57,7 +58,7 @@ def get_final_redirect_url(driver, url):
         driver.switch_to.window(driver.window_handles[0])
         return ""
 
-def crawl_danawa_keyboards(driver, query="키보드", max_count=5, sort=None, page_limit=1):
+def crawl_danawa_keyboards(driver, query, max_count, sort, page_limit):
     results = []
     base_url = "https://search.danawa.com/dsearch.php"
 
@@ -74,6 +75,13 @@ def crawl_danawa_keyboards(driver, query="키보드", max_count=5, sort=None, pa
             By.CSS_SELECTOR, "div.main_prodlist.main_prodlist_list > ul > li.prod_item"
         )
 
+
+        # 대체 구조: 키캡이나 액세서리형
+        if len(products) == 0:
+            products = driver.find_elements(By.CSS_SELECTOR, "div.prod_main_info")
+
+        print(f"[DEBUG] 상품 개수: {len(products)}")
+        
         for idx, p in enumerate(products):
             if len(results) >= max_count:
                 break
@@ -120,22 +128,41 @@ def crawl_danawa_keyboards(driver, query="키보드", max_count=5, sort=None, pa
             except:
                 final_url = ""
 
-            results.append(
-                {
-                    "name": name,
-                    "price": price,
-                    "description": spec_keywords,
-                    "thumbnail": thumbnail,
-                    "options": options,
-                    "detail_page_url": detail_page_url,
-                    "final_purchase_url": final_url,  # ← 이 필드에 저장
-                }
-            )
+            # 카테고리 처리
+            query = query.lower()  # 영어 처리를 위한 소문자 변환
+
+            if "키보드 케이스" in query or "keyboard case" in query:
+                category = "case"
+            elif "키캡" in query or "keycap" in query:
+                category = "keycap"
+            elif "베어본" in query or "하우징" in query or "housing" in query:
+                category = "housing"
+            elif "스위치" in query or "switch" in query:
+                category = "switch"
+            elif "케이스" in query or "case" in query:
+                category = "case"
+            elif "키보드" in query or "keyboard" in query:
+                category = "keyboard"
+            else:
+                category = "accessory"
+
+            results.append({
+                "name": str(name),
+                "price": double(price), 
+                "category": str(category),
+                "description": str(spec_keywords),
+                "thumbnail": str(thumbnail),
+                "options": options,
+                ""
+                "detail_page_url": detail_page_url,
+                "final_purchase_url": str(final_url),
+            })
+
 
         if len(results) >= max_count:
             break
 
     return results
 
-def crawl_danawa_product_list(driver, query, sort=None, max_items=10, page_limit=1):
+def crawl_danawa_product_list(driver, query, sort, max_items, page_limit):
     return crawl_danawa_keyboards(driver, query=query, sort=sort, max_count=max_items, page_limit=page_limit)

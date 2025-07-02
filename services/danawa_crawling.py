@@ -5,6 +5,7 @@ import time
 from urllib.parse import parse_qs, quote_plus, urlparse
 
 from bs4 import BeautifulSoup
+from pydantic import BaseModel, ValidationError
 from pymongo import MongoClient
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -14,9 +15,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from services.danawa_list import crawl_danawa_product_list
 
-MONGO_URI = "mongodb://localhost:27017"
+# MONGO_URI = "mongodb+srv://kikihi:kikihi@kikihi.v7xjmxh.mongodb.net/"
+MONGO_URI="mongodb://localhost:27017/"
 DB_NAME = "kikihi"
-COLLECTION_NAME = "products"
+COLLECTION_NAME = "keycap"
 
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
@@ -198,18 +200,47 @@ def crawl_danawa_product_detail(driver, detail_url):
     detail_data = {}
     if not detail_data.get("final_purchase_url"):
         detail_data["final_purchase_url"] = get_final_purchase_url(driver)
-    # 이미 값이 있으면 기존 값 유지!
-
     detail_data["spec_table"] = get_spec_table(driver)
+    if "제조회사" in detail_data["spec_table"]:
+        manufacturer = detail_data["spec_table"]["제조회사"]
+        manufacturer_clean = re.sub(r'\(.*?\)', '', manufacturer).strip()
+        detail_data["manufacturer"] = manufacturer_clean
+    else:
+        detail_data["manufacturer"] = None
     detail_data["all_detail_images"] = get_all_detail_images(driver)
     return detail_data
 
+# def crawl_danawa_product_detail(driver, detail_url):
+#     try:
+#         driver.get(detail_url)
+#         WebDriverWait(driver, 15).until(
+#             lambda d: d.execute_script("return document.readyState") == "complete"
+#         )
+#         time.sleep(1)
+#     except Exception as page_load_err:
+#         return {
+#             "detail_page_url": detail_url,
+#             "error": f"Page load error: {page_load_err}",
+#         }
+#     detail_data = {}
+#     if not detail_data.get("final_purchase_url"):
+#         detail_data["final_purchase_url"] = get_final_purchase_url(driver)
+#     # 이미 값이 있으면 기존 값 유지!
+#     detail_data["spec_table"] = get_spec_table(driver)
+#     if "제조회사" in detail_data["spec_table"]:
+#         manufacturer = detail_data["spec_table"]["제조회사"]
+#         manufacturer_clean = re.sub(r'\(.*?\)', '', manufacturer).strip() 
+#         detail_data["manufacturer"] = manufacturer_clean
+#     else:
+#         detail_data["manufacturer"] = None
+#         detail_data["all_detail_images"] = get_all_detail_images(driver)
+#         return detail_data
+
 def crawl_products(
     query: str,
-    sort: str = "accuracy",
-    max_items: int = 1,
-    save_format: str = "json",
-    page_limit: int = 1,
+    sort: str,
+    max_items: int,
+    page_limit: int,
     headless: bool = True,
 ):
     list_driver = get_driver(headless=headless)
@@ -229,6 +260,7 @@ def crawl_products(
             list_driver.quit()
     if not list_products:
         return []
+    
     detail_page_driver = get_driver(headless=headless)
     for i, item in enumerate(list_products):
         name = item.get("name", "Unknown Product")
@@ -244,6 +276,9 @@ def crawl_products(
             product_details = crawl_danawa_product_detail(detail_page_driver, bridge_url)
             combined_data = {**item, **product_details}
             all_product_data.append(combined_data)
+            print(f"[INFO] 총 상품 개수: {len(list_products)}")
+            print(f"[INFO] 크롤링 완료된 상품 개수: {len(all_product_data)}")
+
         except Exception as e:
             all_product_data.append({**item, "detail_crawl_error": str(e)})
         if i < len(list_products) - 1:
@@ -251,26 +286,42 @@ def crawl_products(
     if detail_page_driver:
         detail_page_driver.quit()
     try:
+        # MongoDB에 데이터 삽입
         if all_product_data:
-            collection.insert_many(all_product_data)
-        client.close()
-    except Exception:
-        pass
+           
+            for data in all_product_data:
+                # 고유 키: 예시로 상품명과 상세페이지 URL을 사용
+                unique_key = {
+                    'name': data.get('name'),
+                    'detail_page_url': data.get('detail_page_url'),
+                }
+                update_data = {'$set': data}
+                result = collection.update_one(unique_key, update_data, upsert=True)
+
+                if result.upserted_id:
+                    print(f"[MONGO] Inserted new document for {data.get('name')}")
+                elif result.matched_count:
+                    print(f"[MONGO] Updated document for {data.get('name')}")
+
+            client.close()
+    except Exception as e:
+        print(f"[ERROR] MongoDB 저장 실패: {str(e)}")
+
     return all_product_data
 
-def danawa_crawling():
-    query = "60커스텀 키보드 하우징"
-    sort = "accuracy"
-    max_items = 3
-    page_limit = 1
-    data = crawl_products(
-        query=query,
-        sort=sort,
-        max_items=max_items,
-        page_limit=page_limit,
-        headless=True,
-    )
+# def danawa_crawling():
+#     query = "60커스텀 키보드 하우징"
+#     sort = "accuracy"
+#     max_items = 50
+#     page_limit = 50
+#     data = crawl_products(
+#         query=query,
+#         sort=sort,
+#         max_items=max_items,
+#         page_limit=page_limit,
+#         headless=True,
+#     )
   
 
-if __name__ == "__main__":
-    danawa_crawling()
+# if __name__ == "__main__":
+#     danawa_crawling()

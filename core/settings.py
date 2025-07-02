@@ -27,7 +27,7 @@ class Settings(BaseSettings):
 
     @property
     def mongo_uri(self) -> str:
-        return f"mongodb://{self.mongo_host}:{self.mongo_port}/{self.mongo_db}"
+        return f"mongodb+srv://kikihi:kikihi@kikihi.v7xjmxh.mongodb.net/"
 
 
 @lru_cache()

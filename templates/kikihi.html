@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>상품 전체 목록</title>
+  <style>
+    body {
+      font-family: 'Apple SD Gothic Neo', Arial, sans-serif;
+      background: #f7f7f7;
+      margin: 40px;
+      color: #222;
+    }
+    .products-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 32px;
+      justify-content: flex-start;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      width: 375px;
+      margin-bottom: 32px;
+      padding: 22px 28px 24px 28px;
+      display: flex;
+      flex-direction: column;
+    }
+    .product-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      margin-bottom: 17px;
+    }
+    .product-thumbnail {
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      width: 164px;
+      height: 148px;
+      object-fit: cover;
+      box-shadow: 0 1px 8px #ddd;
+    }
+    .product-info {
+      flex: 1;
+    }
+    .product-name {
+      font-size: 1.05em;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .product-price {
+      font-size: 1em;
+      font-weight: 600;
+      color: #ff3e1d;
+      margin-bottom: 10px;
+    }
+    .product-link {
+      text-decoration: none;
+      color: #2563eb;
+      font-size: 0.95em;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .product-desc {
+      background: #f3f6fa;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      color: #47607a;
+      font-size: 0.96em;
+    }
+    .detail-images img {
+      width: 100%;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 8px #ececec;
+    }
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95em;
+    }
+    .spec-table th, .spec-table td {
+      padding: 6px 7px;
+      border-bottom: 1px solid #e8eaf0;
+      text-align: left;
+    }
+    .spec-table th {
+      background: #f9fafb;
+      width: 32%;
+      color: #446288;
+      font-weight: 500;
+    }
+    .spec-table td {
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+  <h2 style="margin-bottom:28px;">전체 상품 목록</h2>
+  <div class="products-grid">
+    {% for product in products %}
+      <div class="product-card">
+        <div class="product-header">
+          <img class="product-thumbnail" src="{{ product.thumbnail }}" alt="썸네일">
+          <div class="product-info">
+            <div class="product-name">{{ product.name }}</div>
+            <div class="product-price">{{ product.price }}원</div>
+            <a class="product-link" href="{{ product.detail_page_url }}" target="_blank">상세 페이지 바로가기</a>
+            <div class="product-desc">{{ product.description }}</div>
+            <div>제조사: {{ product.manufacturer }}</div>
+            <div>카테고리: {{ product.category }}</div>
+          </div>
+        </div>
+        <div class="detail-images">
+          {% for img in product.all_detail_images %}
+            <img src="{{ img }}" alt="상세 이미지">
+          {% endfor %}
+        </div>
+        <table class="spec-table">
+          {% for key, value in product.spec_table.items() %}
+            <tr>
+              <th>{{ key }}</th>
+              <td>{{ value }}</td>
+            </tr>
+          {% endfor %}
+        </table>
+      </div>
+    {% endfor %}
+  </div>
+</body>
+</html>

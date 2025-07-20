@@ -243,8 +243,13 @@ def crawl_products(
     page_limit: int,
     headless: bool = True,
 ):
+    # 1. 이미 저장된 상품의 detail_page_url 목록 조회
+    saved_urls = set()
+    for doc in collection.find({}, {"detail_page_url": 1}):
+        if doc.get("detail_page_url"):
+            saved_urls.add(doc["detail_page_url"])
+
     list_driver = get_driver(headless=headless)
-    all_product_data = []
     try:
         list_products = crawl_danawa_product_list(
             list_driver,
@@ -263,51 +268,34 @@ def crawl_products(
     
     detail_page_driver = get_driver(headless=headless)
     for i, item in enumerate(list_products):
-        name = item.get("name", "Unknown Product")
         bridge_url = item.get("detail_page_url")
-        if bridge_url:
-            actual_url = get_danawa_actual_purchase_link(bridge_url)
-        if not bridge_url:
-            all_product_data.append(
-                {**item, "detail_crawl_error": "Missing detail page URL"}
-            )
+        # 2. 이미 저장된 상품이면 건너뜀
+        if not bridge_url or bridge_url in saved_urls:
             continue
+
         try:
             product_details = crawl_danawa_product_detail(detail_page_driver, bridge_url)
             combined_data = {**item, **product_details}
-            all_product_data.append(combined_data)
-            print(f"[INFO] 총 상품 개수: {len(list_products)}")
-            print(f"[INFO] 크롤링 완료된 상품 개수: {len(all_product_data)}")
-
+            # 3. 상품별로 즉시 MongoDB에 upsert 저장
+            unique_key = {
+                'name': combined_data.get('name'),
+                'detail_page_url': combined_data.get('detail_page_url'),
+            }
+            update_data = {'$set': combined_data}
+            
+            result = collection.update_one(unique_key, update_data, upsert=True)
+            if result.upserted_id:
+                print(f"[MONGO] ✅ 새 문서 저장: {combined_data.get('name')}")
+            elif result.modified_count > 0:
+                print(f"[MONGO] 📝 기존 문서 업데이트됨: {combined_data.get('name')}")
+            else:
+                print(f"[MONGO] ⬜ 이미 최신 상태: {combined_data.get('name')}")
+            print(f"[MONGO] Saved: {combined_data.get('name')}")
         except Exception as e:
-            all_product_data.append({**item, "detail_crawl_error": str(e)})
-        if i < len(list_products) - 1:
-            time.sleep(2)
+            print(f"[ERROR] 상품 크롤링 실패: {str(e)}")
+        time.sleep(2)
     if detail_page_driver:
         detail_page_driver.quit()
-    try:
-        # MongoDB에 데이터 삽입
-        if all_product_data:
-           
-            for data in all_product_data:
-                # 고유 키: 예시로 상품명과 상세페이지 URL을 사용
-                unique_key = {
-                    'name': data.get('name'),
-                    'detail_page_url': data.get('detail_page_url'),
-                }
-                update_data = {'$set': data}
-                result = collection.update_one(unique_key, update_data, upsert=True)
-
-                if result.upserted_id:
-                    print(f"[MONGO] Inserted new document for {data.get('name')}")
-                elif result.matched_count:
-                    print(f"[MONGO] Updated document for {data.get('name')}")
-
-            client.close()
-    except Exception as e:
-        print(f"[ERROR] MongoDB 저장 실패: {str(e)}")
-
-    return all_product_data
 
 # def danawa_crawling():
 #     query = "60커스텀 키보드 하우징"

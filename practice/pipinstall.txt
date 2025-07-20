@@ -1,0 +1,15 @@
+pip install fastapi uvicorn redis kafka-python requests selenium beautifulsoup4
+pip install celery
+
+
+docker-compose down --volumes --remove-orphans
+docker-compose build --no-cache
+docker-compose up
+
+
+docker build는 dockerfile을 읽어서 해당 서비스의 실행환경을 준비하도록 이미지를 만듦(dockerfile, requirements 등 이미지 내용이 바뀔때) - 이거 적용하니까 됨
+필요하면 먼저 build를 수행하고 compose up -d를 실행행
+
+
+pip install playwright asyncio playwright-stealth
+playwright install

@@ -4,18 +4,13 @@ from bson import ObjectId
 from celery.result import AsyncResult
 from fastapi import APIRouter, Body, Query
 
-from celery_worker import celery_app
+# from celery_worker import celery_app
 from core.config import get_mongo_collection
 from models.product_request import CrawlRequest
 from models.products import CrawlingResponse, ProductModel
 from services.danawa_crawling import crawl_products
-from tasks.product_tasks import (
-    crawl_products_task,
-    get_lowest_price,
-    insert_products_task,
-)
 
-products_col = get_mongo_collection("products")
+# products_col = get_mongo_collection("products")
 
 router = APIRouter()
 
@@ -79,12 +74,12 @@ def health_check():
 #     return {"task_id": task.id, "message": "크롤링 작업이 큐에 등록되었습니다."}
 
 
-# 매주 새로운 데이터 mongoDB에 삽입
-@router.post("/insert-products")
-async def batch_upload(products: list[ProductModel]):
-    product_dicts = [p.dict() for p in products]
-    insert_products_task.delay(product_dicts)
-    return {"message": "적재 작업 큐에 등록 완료", "item_count": len(product_dicts)}
+# # 매주 새로운 데이터 mongoDB에 삽입
+# @router.post("/insert-products")
+# async def batch_upload(products: list[ProductModel]):
+#     product_dicts = [p.dict() for p in products]
+#     insert_products_task.delay(product_dicts)
+#     return {"message": "적재 작업 큐에 등록 완료", "item_count": len(product_dicts)}
 
 
 # 최저가 갱신

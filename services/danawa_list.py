@@ -87,12 +87,12 @@ def get_highres_thumbnail(url):
 
 
 
-def crawl_danawa_keyboards(driver, query, max_count, sort, page_limit):
+def crawl_danawa_keyboards(driver, query, max_count, sort, start_page=1, end_page=1):
     from numpy import double
     results = []
     base_url = "https://search.danawa.com/dsearch.php"
 
-    for page in range(1, page_limit + 1):
+    for page in range(start_page, end_page + 1):
         sort_param = f"&listSort={sort}" if sort else ""
         url = f"{base_url}?query={quote_plus(query)}{sort_param}&page={page}&tab=main"
 
@@ -108,7 +108,8 @@ def crawl_danawa_keyboards(driver, query, max_count, sort, page_limit):
         if not products:
             products = driver.find_elements(By.CSS_SELECTOR, "div.prod_main_info")
 
-        print(f"[DEBUG] 상품 개수: {len(products)}")
+        print(f"[DEBUG] PAGE {page} - 상품 개수: {len(products)}")
+
 
         for idx, p in enumerate(products or []):  # 혹시라도 products가 None이면 []로
             if len(results) >= max_count:
@@ -322,9 +323,10 @@ def crawl_danawa_keyboards(driver, query, max_count, sort, page_limit):
 
 #     return results
 
-def crawl_danawa_product_list(driver, query, sort, max_items, page_limit):
+def crawl_danawa_product_list(driver, query, sort, max_items, start_page, end_page):
     try:
-        return crawl_danawa_keyboards(driver, query=query, sort=sort, max_count=max_items, page_limit=page_limit)
+        return crawl_danawa_keyboards(driver, query=query, sort=sort, max_count=max_items, start_page=start_page,
+            end_page=end_page)
     except Exception as e:
         print("에러:", e)
         return []

@@ -24,7 +24,8 @@ async def crawl_danawa_products(
     query: str = Query(..., description="검색어를 입력하세요"),
     sort: str = Query("saveDESC", description="정렬 방식"),
     max_items: int = Query(50, description="최대 아이템 수"),
-    page_limit: int = Query(50, description="페이지 제한"),
+    start_page: int = Query(1, description="시작 페이지 번호"),
+    end_page: int = Query(1, description="끝 페이지 번호"),
     headless: bool = Query(True, description="헤드리스 모드"),
 ):
     """
@@ -37,7 +38,8 @@ async def crawl_danawa_products(
             query=query,
             sort=sort,
             max_items=max_items,
-            page_limit=page_limit,
+            start_page=start_page,
+            end_page=end_page,
             headless=headless,
         )
         safe_data = convert_object_ids(data or [])

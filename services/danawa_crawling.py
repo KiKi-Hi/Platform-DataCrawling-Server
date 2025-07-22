@@ -301,7 +301,8 @@ def crawl_products(
     query: str,
     sort: str,
     max_items: int,
-    page_limit: int,
+    start_page: int,
+    end_page: int,
     headless: bool = True,
 ):
     saved_urls = set()
@@ -316,8 +317,9 @@ def crawl_products(
             query=query,
             sort=sort,
             max_items=max_items,
-            page_limit=page_limit,
-        )
+            start_page=start_page,
+            end_page=end_page  
+            )
     except Exception:
         list_products = []
     finally:

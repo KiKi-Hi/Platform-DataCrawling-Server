@@ -16,39 +16,42 @@ router = APIRouter()
 
 
 # 직접 상품 여러 개 적재 (Bulk Insert)
+from fastapi.concurrency import run_in_threadpool
+
+
 @router.post("/api/crawl", response_model=CrawlingResponse)
 async def crawl_danawa_products(
     query: str = Query(..., description="검색어를 입력하세요"),
     sort: str = Query("saveDESC", description="정렬 방식"),
     max_items: int = Query(50, description="최대 아이템 수"),
     page_limit: int = Query(50, description="페이지 제한"),
-    headless: bool = Query(True, description="헤드리스 모드")
+    headless: bool = Query(True, description="헤드리스 모드"),
 ):
     """
     다나와 상품 크롤링 API (query 파라미터로 직접 검색어 입력)
     """
     try:
-        data = crawl_products(
+        # run_in_threadpool로 안전하게 크롤러 실행
+        data = await run_in_threadpool(
+            crawl_products,
             query=query,
             sort=sort,
             max_items=max_items,
             page_limit=page_limit,
             headless=headless,
         )
-        
-        # ObjectId -> str로 변환
-        safe_data = convert_object_ids(data)
-        
+        safe_data = convert_object_ids(data or [])
         return CrawlingResponse(
             success=True,
             data=safe_data,
-            message="크롤링이 성공적으로 완료되었습니다."
+            message="크롤링이 성공적으로 완료되었습니다.",
         )
     except Exception as e:
+        print(f"[ERROR] 크롤링 중 예외 발생: {e}")
         return CrawlingResponse(
             success=False,
             data=[],
-            message=f"크롤링 중 오류 발생: {str(e)}"
+            message="크롤링 중 알 수 없는 오류 발생",
         )
 
 

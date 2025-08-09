@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>상품 전체 목록</title>
   <style>
     body {
@@ -102,29 +102,41 @@
     {% for product in products %}
       <div class="product-card">
         <div class="product-header">
-          <img class="product-thumbnail" src="{{ product.thumbnail }}" alt="썸네일">
+          <img class="product-thumbnail" src="{{ product.thumbnail }}" alt="썸네일" />
           <div class="product-info">
             <div class="product-name">{{ product.name }}</div>
             <div class="product-price">{{ product.price }}원</div>
+             <!-- 옵션 목록 추가 -->
+              {% if product.options %}
+                <div>
+                  <strong>옵션:</strong>
+                  <ul style="margin:4px 0 10px 16px; padding:0; list-style-type: disc;">
+                    {% for option in product.options %}
+                      <li>{{ option }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+            {% endif %}
+  
             <a class="product-link" href="{{ product.detail_page_url }}" target="_blank">상세 페이지 바로가기</a>
             <div class="product-desc">{{ product.description }}</div>
             <div>제조사: {{ product.manufacturer }}</div>
             <div>카테고리: {{ product.category }}</div>
           </div>
         </div>
-        <div class="detail-images">
-          {% for img in product.all_detail_images %}
-            <img src="{{ img }}" alt="상세 이미지">
-          {% endfor %}
-        </div>
-        <table class="spec-table">
-          {% for key, value in product.spec_table.items() %}
-            <tr>
-              <th>{{ key }}</th>
-              <td>{{ value }}</td>
-            </tr>
-          {% endfor %}
-        </table>
+  
+        {% if product.spec_table %}
+          <table class="spec-table">
+            {% for key, value in product.spec_table.items() %}
+              <tr>
+                <th>{{ key }}</th>
+                <td>{{ value }}</td>
+              </tr>
+            {% endfor %}
+          </table>
+        {% else %}
+          <div>스펙 정보 없음</div>
+        {% endif %}
       </div>
     {% endfor %}
   </div>
